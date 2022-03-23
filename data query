@@ -1,0 +1,168 @@
+-------------------------------
+---queries for data cleaning 
+-------------------------------
+-- FIRST Creating table 
+-------------------------------
+
+CREATE TABLE House_data(
+UniqueID BIGSERIAL PRIMARY KEY,
+ParcelID VARCHAR(100),
+LandUse VARCHAR(100),
+PropertyAddress VARCHAR(100),
+SaleDate DATE,
+SalePrice VARCHAR,
+LegalReference VARCHAR(100),
+SoldAsVacant VARCHAR(10),
+OwnerName VARCHAR(60),
+OwnerAddress VARCHAR(200),
+Acreage NUMERIC,
+TaxDistrict VARCHAR(200),
+LandValue FLOAT,
+BuildingValue FLOAT, 
+TotalValue FLOAT,
+YearBuilt NUMERIC,
+Bedrooms NUMERIC,
+FullBath NUMERIC,
+HalfBath NUMERIC
+)
+
+-----------------------
+-- Cheacking the table 
+-----------------------
+
+SELECT *
+FROM HOUSE_DATA
+
+------------------------------
+--filling the Propertyaddress
+------------------------------
+
+SELECT propertyaddress, parcelid
+FROM HOUSE_DATA
+WHERE propertyaddress is null
+
+SELECT a.parcelid, b.parcelid, a.propertyaddress, b.propertyaddress,
+CASE WHEN a.propertyaddress IS NULL 
+            THEN b.propertyaddress
+            ELSE null
+    END 
+FROM house_data a
+join house_data b
+on a.parcelid = b.parcelid
+AND a.uniqueid <> b.uniqueid
+WHERE a.propertyaddress is null;
+
+
+UPDATE HOUSE_DATA 
+SET propertyaddress = CASE 
+WHEN a.propertyaddress IS NULL 
+            THEN b.propertyaddress
+            ELSE null
+    END  
+FROM house_data a
+join house_data b
+on a.parcelid = b.parcelid
+AND a.uniqueid <> b.uniqueid
+WHERE a.propertyaddress is null;
+
+-------------------------------------------------------------------
+--Separating  address into individual columns(address, city, state)
+-------------------------------------------------------------------
+
+SELECT propertyaddress
+FROM house_data
+
+SELECT
+SUBSTRING(propertyaddress, 1, POSITION(',' IN propertyaddress)-1) AS address,
+SUBSTRING(propertyaddress,POSITION(',' IN propertyaddress)+2) as address
+FROM house_data
+
+
+ALTER TABLE house_data
+ADD propertysplitaddress varchar(200);
+
+UPDATE house_data
+SET propertysplitaddress=SUBSTRING(propertyaddress, 1, POSITION(',' IN propertyaddress)-1)
+
+
+ALTER TABLE house_data
+ADD propertysplitcity varchar(100);
+
+UPDATE house_data
+SET propertysplitcity=SUBSTRING(propertyaddress, POSITION(',' IN propertyaddress)+2)
+
+
+SELECT owneraddress
+FROM HOUSE_DATA
+
+SELECT owneraddress,
+SPLIT_PART(REPLACE(owneraddress,',','#'),'#',1),
+SPLIT_PART(REPLACE(owneraddress,',','#'),'#',2),
+SPLIT_PART(REPLACE(owneraddress,',','#'),'#',3)
+FROM HOUSE_DATA
+
+ALTER TABLE house_data
+ADD ownersplitaddress varchar(100);
+
+UPDATE house_data
+SET ownersplitaddress=SPLIT_PART(REPLACE(owneraddress,',','#'),'#',1);
+
+ALTER TABLE house_data
+ADD ownersplitcity varchar(100);
+
+UPDATE house_data
+SET ownersplitcity=SPLIT_PART(REPLACE(owneraddress,',','#'),'#',2);
+
+ALTER TABLE house_data
+ADD ownersplitstate varchar(100);
+
+UPDATE house_data
+SET ownersplitstate=SPLIT_PART(REPLACE(owneraddress,',','#'),'#',3);
+
+SELECT* FROM house_data  ---(cheacking the updates)
+
+---------------------------------------
+--converting Y and N INTO yes and NO 
+---------------------------------------
+
+SELECT DISTINCT soldasvacant, COUNT(soldasvacant)
+FROM house_data
+GROUP BY soldasvacant
+ORDER BY 2;                                 ----(Exploring data)
+
+
+SELECT soldasvacant,
+case WHEN  soldasvacant = 'Y' THEN 'YES'
+	 WHEN  soldasvacant ='N' THEN 'NO'
+	 ELSE  soldasvacant
+	 END
+FROM house_data ;	
+
+
+UPDATE house_data
+SET soldasvacant=case WHEN  soldasvacant = 'Y' THEN 'YES'
+	 WHEN  soldasvacant ='N' THEN 'NO'
+	 ELSE  soldasvacant
+	 END;
+
+----------------------
+--Remove duplicate	 
+----------------------
+
+WITH ROW_NO
+AS
+(SELECT * ,
+RANK() OVER(PARTITION BY
+			parcelID,
+			 propertyaddress,
+			 saledate,
+			saleprice,
+			legalreference
+			 order by uniqueID) as row
+FROM HOUSE_DATA	)	
+delete
+FROM ROW_NO
+WHERE row>1
+			 
+SELECT*
+FROM HOUSE_DATA
